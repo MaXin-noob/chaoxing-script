@@ -5,7 +5,7 @@ import re
 import sys
 from selenium import webdriver
 from search import SearchAnswer
-import json
+import random
 
 
 class Script(SearchAnswer):
@@ -180,6 +180,41 @@ class Script(SearchAnswer):
 
                 continue
             self.set_answer(question, answer, qu_type)
+
+    def random_answer(self, question, answer, type):
+        if type == 0:
+            tempNumber = 0
+            ans = question.find_elements_by_xpath(
+                "div[2]//ul/li")
+            random_key = random.randint(0, 3)
+            for an in ans:
+                tempNumber += 1
+                an = an.find_element_by_xpath("a")
+                if tempNumber == random_key:
+                    an.click()
+        elif type == 1:
+            tempNumber = 0
+            ans = question.find_elements_by_xpath(
+                "div[2]//ul/li")
+            random_key = random.randint(0, 3)
+            for an in ans:
+                tempNumber += 1
+                an = an.find_element_by_xpath("a")
+                if tempNumber == random_key:
+                    an.click()
+        elif type == 3:
+            ans = question.find_elements_by_xpath(
+                "div[2]//ul/li")
+            for an in ans:
+                an = an.find_element_by_xpath("label")
+                str2 = re.sub(
+                    u"([^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a])", "", answer["data"])
+                if str2 == "正确":
+                    an.find_element_by_xpath(
+                        "//input[@value='true']").click()
+                else:
+                    an.find_element_by_xpath(
+                        "//input[@value='false']").click()
 
     def set_answer(self, question, answer, type):
         if type == 0:
