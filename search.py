@@ -1,6 +1,7 @@
 
 import requests
 from urllib import parse
+import json
 
 
 class SearchAnswer:
@@ -21,10 +22,6 @@ class SearchAnswer:
         }
         payload = 'question={0}&type={1}'.format(self.question,self.type)
         response = requests.request(self.method, self.api, headers=headers, data=payload)
-        print(response.text)
+        return json.loads(response.text)
 
 
-
-# search = SearchAnswer("http://cx.icodef.com/wyn-nb?v=4")
-# search.set_question("关于树立正确的党史观，下列说法中错误的是",0)
-# search.get_answer()

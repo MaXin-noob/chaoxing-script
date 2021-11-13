@@ -5,6 +5,7 @@ import re
 import sys
 from selenium import webdriver
 from search import SearchAnswer
+import json
 
 
 class Script(SearchAnswer):
@@ -94,14 +95,16 @@ class Script(SearchAnswer):
         time.sleep(self.delay)
 
     def task_finish(self):
-        self.driver.switch_to.frame("iframe")
-        class_name = self.driver.find_element_by_class_name("ZyTop")
+        self.switch_window()
+        class_name = self.driver.find_element_by_class_name("main")
         title = class_name.find_element_by_xpath(
-            "h3").get_attribute('textContent')
+            "h1").get_attribute('textContent')
+        time.sleep(self.delay)
+        self.driver.switch_to.frame("iframe")
         time.sleep(self.delay)
         isOk = self.driver.find_element_by_class_name("ans-job-icon")
         if isOk.value_of_css_property('background-position-y') == "-24px":  # 完成
-            print("这个任务点:", title, "已经完成")
+            print("任务点:", title, "已经完成")
             return True
         else:
             return False
@@ -111,35 +114,42 @@ class Script(SearchAnswer):
         print("进入播放页面")
         self.driver.find_element_by_xpath(
             "//div[@class='leveltwo']/h3/a").click()
-        self.switch_window()
-        self.driver.find_element_by_id("right2").click()
-        self.get_question()
-        # while True:
-        #     if self.task_finish:
-        #         self.switch_window()
-        #         self.driver.find_element_by_id("right2").click()
-        #         self.get_question()
-        #     else:
-        #         videoFrame = self.driver.find_element_by_xpath("//iframe")
-        #         self.driver.switch_to.frame(videoFrame)
-        #         vedio = self.driver.find_element_by_id("video_html5_api")
-        #         self.driver.find_element_by_xpath("//button").click()
-        #         self.driver.execute_script("arguments[0].muted=true", vedio)
-        #         ActionChains(driver=self.driver).move_to_element(
-        #             vedio).perform()
-        #         time.sleep(self.delay)
-        #         while True:
-        #             regex = r'<div class="vjs-play-progress vjs-slider-bar" style="width: (.*?)%;">'
-        #             result = re.search(regex, self.driver.page_source, re.S)
-        #             res = result.group(1) if result else None
-        #             print("\r当前播放到: {}".format(res)+'％', end=" ")
-        #             if res == "100":
-        #                 print("当前课程已经完成，将自动跳转到下一个课程")
-        #                 break
-        #             time.sleep(3)
-        #         self.switch_window()
+        while True:
+            if self.task_finish():
+                self.switch_window()
+                self.driver.find_element_by_id("right2").click()
+                if self.task_finish():
+                    self.switch_window()
+                    self.driver.find_element_by_id("right2").click()
+                else:
+                    self.answer_question()
+                    time.sleep(self.delay)
+                    self.driver.execute_script("btnBlueSubmit();")
+                    time.sleep(self.delay)
+                    self.driver.execute_script("form1submit();")
+                    self.switch_window()
+                    self.driver.find_element_by_id("right2").click()
+            else:
+                videoFrame = self.driver.find_element_by_xpath("//iframe")
+                self.driver.switch_to.frame(videoFrame)
+                vedio = self.driver.find_element_by_id("video_html5_api")
+                self.driver.find_element_by_xpath("//button").click()
+                self.driver.execute_script("arguments[0].muted=true", vedio)
+                ActionChains(driver=self.driver).move_to_element(
+                    vedio).perform()
+                time.sleep(self.delay)
+                while True:
+                    regex = r'<div class="vjs-play-progress vjs-slider-bar" style="width: (.*?)%;">'
+                    result = re.search(regex, self.driver.page_source, re.S)
+                    res = result.group(1) if result else None
+                    print("\r当前播放到: {}".format(res)+'％', end=" ")
+                    if res == "100":
+                        print("当前课程已经完成，将自动跳转到下一个课程")
+                        break
+                    time.sleep(3)
+                self.switch_window()
 
-    def get_question(self):
+    def answer_question(self):
         self.switch_window()
         self.driver.switch_to.frame("iframe")
         time.sleep(self.delay)
@@ -151,10 +161,8 @@ class Script(SearchAnswer):
             qu_title = question.find_element_by_xpath(
                 "div/div").get_attribute('textContent')
             print(qu_title)
-            qu_title = qu_title.replace(" ", "")
             pattern = re.compile(r'【(.*?)】')
             temp = pattern.search(qu_title).group()
-            print(temp)
             qu_type = None
             if temp == "【单选题】":
                 qu_type = 0
@@ -162,9 +170,52 @@ class Script(SearchAnswer):
                 qu_type = 1
             elif temp == "【判断题】":
                 qu_type = 3
-            qu_title = qu_title.replace(temp, "").replace(
-                "（", "").replace("）", "").replace("。", "")
+            qu_title = qu_title.replace(temp, "")
             self.set_question(qu_title, qu_type)
-            self.get_answer()
-            print(qu_title)
-            break
+            answer = self.get_answer()
+            if answer["code"] == -1:
+                print("题库中没有题目", qu_title)
+                print("正在随机作答")
+                # TODO 添加随机作答功能
+
+                continue
+            self.set_answer(question, answer, qu_type)
+
+    def set_answer(self, question, answer, type):
+        if type == 0:
+            ans = question.find_elements_by_xpath(
+                "div[2]//ul/li")
+            for an in ans:
+                an = an.find_element_by_xpath("a")
+                str1 = re.sub(
+                    u"([^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a])", "", an.get_attribute("textContent"))
+                str2 = re.sub(
+                    u"([^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a])", "", answer["data"])
+                if str1 == str2:
+                    an.click()
+        elif type == 1:
+            ans = question.find_elements_by_xpath(
+                "div[2]//ul/li")
+            for an in ans:
+                an = an.find_element_by_xpath("a")
+                str1 = re.sub(
+                    u"([^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a])", "", an.get_attribute("textContent"))
+                str2_s = answer["data"].split("#")
+                for str2 in str2_s:
+                    str2 = re.sub(
+                        u"([^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a])", "", str2)
+                    if str1 == str2:
+                        an.click()
+        elif type == 3:
+            ans = question.find_elements_by_xpath(
+                "div[2]//ul/li")
+            for an in ans:
+                an = an.find_element_by_xpath("label")
+                str2 = re.sub(
+                    u"([^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a])", "", answer["data"])
+                if str2 == "正确":
+                    an.find_element_by_xpath(
+                        "//input[@value='true']").click()
+                else:
+                    an.find_element_by_xpath(
+                        "//input[@value='false']").click()
